@@ -179,6 +179,51 @@
     display: block;
   }
 
+  .name-input-wrap {
+    margin-bottom: 28px;
+    width: 100%;
+    max-width: 340px;
+  }
+  .name-input-wrap label {
+    display: block;
+    font-family: 'Space Mono', monospace;
+    font-size: 12px;
+    color: var(--muted);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    margin-bottom: 10px;
+  }
+  .name-input-wrap input {
+    width: 100%;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px 18px;
+    font-family: 'Syne', sans-serif;
+    font-size: 16px;
+    color: var(--text);
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  .name-input-wrap input:focus { border-color: var(--accent); }
+  .name-input-wrap input::placeholder { color: var(--muted); }
+  .name-error {
+    color: var(--red);
+    font-size: 13px;
+    margin-top: 8px;
+    display: none;
+    font-family: 'Space Mono', monospace;
+  }
+  .send-status {
+    margin-top: 20px;
+    font-family: 'Space Mono', monospace;
+    font-size: 13px;
+    color: var(--muted);
+    min-height: 20px;
+  }
+  .send-status.ok { color: var(--green); }
+  .send-status.err { color: var(--red); }
+
   .btn-start {
     font-family: 'Syne', sans-serif;
     font-size: 17px;
@@ -483,10 +528,22 @@
     <div class="info-card"><span class="val">20</span><span class="lbl">Minutes</span></div>
     <div class="info-card"><span class="val">/20</span><span class="lbl">Score</span></div>
   </div>
+  <div class="name-input-wrap">
+    <label for="player-code">Code étudiant</label>
+    <input type="text" id="player-code" placeholder="Ex: ETU2024001" maxlength="30" />
+  </div>
+  <div class="name-input-wrap">
+    <label for="player-prenom">Prénom</label>
+    <input type="text" id="player-prenom" placeholder="Ex: Aminata" maxlength="60" />
+  </div>
+  <div class="name-input-wrap">
+    <label for="player-nom">Nom</label>
+    <input type="text" id="player-nom" placeholder="Ex: Coulibaly" maxlength="60" />
+  </div>
+  <div class="name-error" id="name-error">⚠ Veuillez remplir tous les champs avant de commencer.</div>
   <button class="btn-start" onclick="startQuiz()">Démarrer le quiz →</button>
+  <div class="send-status" id="send-status"></div>
 </div>
-
-<!-- ===== QUIZ ===== -->
 <header id="quiz-header" style="display:none;">
   <div class="logo">// SQL Transactions Quiz</div>
   <div class="hud">
@@ -722,7 +779,22 @@ let currentQ = 0, score = 0, timerInterval = null, secondsLeft = 1200;
 let userAnswers = [];
 let startTime = null;
 
+const SHEET_URL = "https://script.google.com/macros/s/AKfycbxY4Q5yIBScRwBEhbYpqt14N2WPny_FUg5883sxJ1IIhan__utSVYcItLPcEmUIctuj/exec";
+let playerName = "";
+
 function startQuiz() {
+  const code   = document.getElementById('player-code').value.trim();
+  const prenom = document.getElementById('player-prenom').value.trim();
+  const nom    = document.getElementById('player-nom').value.trim();
+  if (!code || !prenom || !nom) {
+    document.getElementById('name-error').style.display = 'block';
+    if (!code) document.getElementById('player-code').focus();
+    else if (!prenom) document.getElementById('player-prenom').focus();
+    else document.getElementById('player-nom').focus();
+    return;
+  }
+  document.getElementById('name-error').style.display = 'none';
+  playerName = { code, prenom, nom };
   document.getElementById('start-screen').classList.remove('active');
   document.getElementById('quiz-header').style.display = 'flex';
   document.getElementById('quiz-screen').classList.add('active');
@@ -857,21 +929,34 @@ function showResults() {
     reviewList.appendChild(div);
   });
 
-  // Questions non répondues (temps écoulé)
-  for (let i = userAnswers.length; i < 20; i++) {
-    const q = QUESTIONS[i];
-    const div = document.createElement('div');
-    div.className = 'review-item ko';
-    div.innerHTML = `
-      <div class="ri-dot">—</div>
-      <div>
-        <div class="ri-q">${q.q}</div>
-        <div class="ri-a">Non répondue → Correct : ${q.options[q.correct]}</div>
-      </div>
-    `;
-    reviewList.appendChild(div);
+  sendToSheets(score, `${String(em).padStart(2,'0')}:${String(es).padStart(2,'0')}`);
+}
+
+async function sendToSheets(score, temps) {
+  const statusEl = document.getElementById('send-status');
+  statusEl.className = 'send-status';
+  statusEl.textContent = '⏳ Envoi des résultats en cours…';
+  try {
+    await fetch(SHEET_URL, {
+      method: "POST",
+      mode: "no-cors",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        code: playerName.code,
+        prenom: playerName.prenom,
+        nom: playerName.nom,
+        score: score + "/20",
+        temps
+      })
+    });
+    statusEl.className = 'send-status ok';
+    statusEl.textContent = '✓ Résultats enregistrés dans Google Sheets !';
+  } catch (err) {
+    statusEl.className = 'send-status err';
+    statusEl.textContent = '✗ Échec de l\'envoi. Vérifiez votre connexion.';
   }
 }
+
 
 </script>
 </body>
