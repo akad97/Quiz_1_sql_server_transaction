@@ -1,0 +1,878 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Quiz — Transactions SQL Server</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;600;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0e1a;
+    --surface: #111827;
+    --border: #1e2d45;
+    --accent: #00d4ff;
+    --accent2: #ff6b35;
+    --green: #00ff88;
+    --red: #ff3b5c;
+    --text: #e8eaf6;
+    --muted: #7c8db5;
+    --card: #141d2e;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Syne', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  body::before {
+    content: '';
+    position: fixed;
+    top: -200px; left: -200px;
+    width: 600px; height: 600px;
+    background: radial-gradient(circle, rgba(0,212,255,0.07) 0%, transparent 70%);
+    pointer-events: none;
+    z-index: 0;
+  }
+  body::after {
+    content: '';
+    position: fixed;
+    bottom: -200px; right: -200px;
+    width: 600px; height: 600px;
+    background: radial-gradient(circle, rgba(255,107,53,0.06) 0%, transparent 70%);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* ===== HEADER ===== */
+  header {
+    position: sticky; top: 0; z-index: 100;
+    background: rgba(10,14,26,0.92);
+    backdrop-filter: blur(16px);
+    border-bottom: 1px solid var(--border);
+    padding: 14px 32px;
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 16px;
+  }
+
+  .logo {
+    font-size: 13px;
+    font-family: 'Space Mono', monospace;
+    color: var(--accent);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+
+  .hud {
+    display: flex; align-items: center; gap: 24px;
+  }
+
+  .timer-wrap {
+    display: flex; align-items: center; gap: 10px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 8px 16px;
+  }
+  .timer-icon { font-size: 18px; }
+  #timer {
+    font-family: 'Space Mono', monospace;
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--accent);
+    min-width: 70px;
+    transition: color 0.3s;
+  }
+  #timer.warning { color: var(--accent2); animation: pulse 1s ease infinite; }
+  #timer.danger { color: var(--red); animation: pulse 0.5s ease infinite; }
+
+  @keyframes pulse {
+    0%,100% { opacity: 1; }
+    50% { opacity: 0.5; }
+  }
+
+  .progress-info {
+    font-family: 'Space Mono', monospace;
+    font-size: 13px;
+    color: var(--muted);
+  }
+  .progress-info span { color: var(--text); font-weight: 700; }
+
+  /* ===== SCREENS ===== */
+  .screen {
+    display: none;
+    min-height: 100vh;
+    position: relative; z-index: 1;
+  }
+  .screen.active { display: flex; flex-direction: column; align-items: center; justify-content: center; }
+
+  /* ===== START SCREEN ===== */
+  #start-screen {
+    padding: 60px 24px;
+    text-align: center;
+  }
+
+  .badge {
+    display: inline-block;
+    font-family: 'Space Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.2em;
+    color: var(--accent);
+    background: rgba(0,212,255,0.1);
+    border: 1px solid rgba(0,212,255,0.3);
+    border-radius: 100px;
+    padding: 6px 18px;
+    margin-bottom: 28px;
+    text-transform: uppercase;
+  }
+
+  h1 {
+    font-size: clamp(36px, 6vw, 72px);
+    font-weight: 800;
+    line-height: 1.05;
+    letter-spacing: -0.02em;
+    margin-bottom: 20px;
+  }
+  h1 em {
+    font-style: normal;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .subtitle {
+    font-size: 17px;
+    color: var(--muted);
+    max-width: 480px;
+    line-height: 1.6;
+    margin-bottom: 48px;
+  }
+
+  .info-grid {
+    display: flex; gap: 20px; flex-wrap: wrap; justify-content: center;
+    margin-bottom: 48px;
+  }
+  .info-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px 28px;
+    text-align: center;
+    min-width: 140px;
+  }
+  .info-card .val {
+    font-size: 32px;
+    font-weight: 800;
+    font-family: 'Space Mono', monospace;
+    color: var(--accent);
+    display: block;
+  }
+  .info-card .lbl {
+    font-size: 13px;
+    color: var(--muted);
+    margin-top: 4px;
+    display: block;
+  }
+
+  .btn-start {
+    font-family: 'Syne', sans-serif;
+    font-size: 17px;
+    font-weight: 700;
+    color: var(--bg);
+    background: linear-gradient(135deg, var(--accent), #0099cc);
+    border: none;
+    border-radius: 12px;
+    padding: 18px 52px;
+    cursor: pointer;
+    letter-spacing: 0.02em;
+    transition: transform 0.2s, box-shadow 0.2s;
+    box-shadow: 0 0 40px rgba(0,212,255,0.3);
+  }
+  .btn-start:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 0 60px rgba(0,212,255,0.5);
+  }
+
+  /* ===== QUIZ SCREEN ===== */
+  #quiz-screen {
+    padding: 40px 24px 80px;
+    align-items: stretch;
+    max-width: 780px;
+    margin: 0 auto;
+    width: 100%;
+  }
+
+  .progress-bar-wrap {
+    width: 100%;
+    height: 4px;
+    background: var(--border);
+    border-radius: 2px;
+    margin-bottom: 40px;
+    overflow: hidden;
+  }
+  .progress-bar-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--accent), var(--accent2));
+    border-radius: 2px;
+    transition: width 0.5s cubic-bezier(0.4,0,0.2,1);
+  }
+
+  .q-meta {
+    font-family: 'Space Mono', monospace;
+    font-size: 12px;
+    color: var(--muted);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    margin-bottom: 12px;
+  }
+
+  .question-text {
+    font-size: clamp(18px, 3vw, 24px);
+    font-weight: 600;
+    line-height: 1.45;
+    margin-bottom: 16px;
+    color: var(--text);
+  }
+
+  .code-block {
+    font-family: 'Space Mono', monospace;
+    font-size: 13px;
+    background: #060b14;
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--accent);
+    border-radius: 8px;
+    padding: 16px 20px;
+    margin-bottom: 28px;
+    color: #a8d8f0;
+    white-space: pre-wrap;
+    line-height: 1.7;
+    overflow-x: auto;
+  }
+
+  .options {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-bottom: 32px;
+  }
+
+  .option-btn {
+    display: flex;
+    align-items: flex-start;
+    gap: 16px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px 20px;
+    cursor: pointer;
+    text-align: left;
+    transition: all 0.2s;
+    color: var(--text);
+    font-family: 'Syne', sans-serif;
+    font-size: 15px;
+    line-height: 1.5;
+    width: 100%;
+  }
+  .option-btn:hover:not(:disabled) {
+    border-color: var(--accent);
+    background: rgba(0,212,255,0.06);
+    transform: translateX(4px);
+  }
+  .option-btn .letter {
+    font-family: 'Space Mono', monospace;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--accent);
+    background: rgba(0,212,255,0.1);
+    border: 1px solid rgba(0,212,255,0.3);
+    border-radius: 6px;
+    width: 28px; height: 28px;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+    margin-top: 1px;
+    transition: all 0.2s;
+  }
+  .option-btn.correct {
+    border-color: var(--green);
+    background: rgba(0,255,136,0.08);
+  }
+  .option-btn.correct .letter {
+    background: rgba(0,255,136,0.2);
+    border-color: var(--green);
+    color: var(--green);
+  }
+  .option-btn.wrong {
+    border-color: var(--red);
+    background: rgba(255,59,92,0.08);
+  }
+  .option-btn.wrong .letter {
+    background: rgba(255,59,92,0.2);
+    border-color: var(--red);
+    color: var(--red);
+  }
+  .option-btn:disabled { cursor: default; }
+
+  .feedback-box {
+    border-radius: 10px;
+    padding: 14px 18px;
+    font-size: 14px;
+    line-height: 1.55;
+    margin-bottom: 24px;
+    display: none;
+    animation: fadeUp 0.3s ease;
+  }
+  .feedback-box.show { display: block; }
+  .feedback-box.correct-fb {
+    background: rgba(0,255,136,0.08);
+    border: 1px solid rgba(0,255,136,0.3);
+    color: #7fffc4;
+  }
+  .feedback-box.wrong-fb {
+    background: rgba(255,59,92,0.08);
+    border: 1px solid rgba(255,59,92,0.3);
+    color: #ffb3bf;
+  }
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .btn-next {
+    font-family: 'Syne', sans-serif;
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--bg);
+    background: var(--accent);
+    border: none;
+    border-radius: 10px;
+    padding: 14px 36px;
+    cursor: pointer;
+    transition: transform 0.2s, background 0.2s;
+    display: none;
+  }
+  .btn-next.show { display: inline-block; }
+  .btn-next:hover { transform: translateY(-2px); background: #33ddff; }
+
+  /* ===== RESULT SCREEN ===== */
+  #result-screen {
+    padding: 60px 24px;
+    text-align: center;
+    align-items: center;
+  }
+
+  .score-circle {
+    width: 180px; height: 180px;
+    border-radius: 50%;
+    border: 3px solid var(--border);
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    margin: 0 auto 36px;
+    position: relative;
+    background: var(--card);
+  }
+  .score-circle::before {
+    content: '';
+    position: absolute;
+    inset: -3px;
+    border-radius: 50%;
+    background: conic-gradient(var(--accent) var(--score-pct), var(--border) 0);
+    z-index: -1;
+  }
+  .score-num {
+    font-family: 'Space Mono', monospace;
+    font-size: 48px;
+    font-weight: 700;
+    color: var(--text);
+    line-height: 1;
+  }
+  .score-denom {
+    font-family: 'Space Mono', monospace;
+    font-size: 16px;
+    color: var(--muted);
+    margin-top: 4px;
+  }
+
+  .result-title {
+    font-size: 32px;
+    font-weight: 800;
+    margin-bottom: 10px;
+  }
+  .result-subtitle {
+    font-size: 16px;
+    color: var(--muted);
+    margin-bottom: 40px;
+    line-height: 1.6;
+  }
+
+  .stats-row {
+    display: flex; gap: 16px; flex-wrap: wrap; justify-content: center;
+    margin-bottom: 40px;
+  }
+  .stat-box {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px 24px;
+    min-width: 120px;
+  }
+  .stat-box .sv {
+    font-family: 'Space Mono', monospace;
+    font-size: 28px;
+    font-weight: 700;
+    display: block;
+  }
+  .stat-box .sl { font-size: 12px; color: var(--muted); margin-top: 4px; display: block; }
+  .stat-box.good .sv { color: var(--green); }
+  .stat-box.bad .sv { color: var(--red); }
+
+
+
+  /* Review section */
+  .review-section {
+    margin-top: 56px;
+    width: 100%;
+    max-width: 700px;
+    text-align: left;
+  }
+  .review-title {
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--muted);
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    margin-bottom: 20px;
+    font-family: 'Space Mono', monospace;
+    font-size: 13px;
+  }
+  .review-item {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px 20px;
+    margin-bottom: 10px;
+    display: flex;
+    align-items: flex-start;
+    gap: 14px;
+  }
+  .review-item .ri-dot {
+    width: 24px; height: 24px; border-radius: 50%;
+    flex-shrink: 0; margin-top: 2px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 13px; font-weight: 700;
+  }
+  .review-item.ok .ri-dot { background: rgba(0,255,136,0.15); color: var(--green); }
+  .review-item.ko .ri-dot { background: rgba(255,59,92,0.15); color: var(--red); }
+  .review-item .ri-q { font-size: 14px; color: var(--text); line-height: 1.5; }
+  .review-item .ri-a { font-size: 13px; color: var(--muted); margin-top: 4px; font-family: 'Space Mono', monospace; }
+</style>
+</head>
+<body>
+
+<!-- ===== START ===== -->
+<div id="start-screen" class="screen active">
+  <span class="badge">SQL Server · Transactions</span>
+  <h1>Quiz <em>Transactions</em><br>SQL Server</h1>
+  <p class="subtitle">Testez vos connaissances sur BEGIN TRANSACTION, COMMIT, ROLLBACK, et la gestion des erreurs avec TRY/CATCH.</p>
+  <div class="info-grid">
+    <div class="info-card"><span class="val">20</span><span class="lbl">Questions</span></div>
+    <div class="info-card"><span class="val">20</span><span class="lbl">Minutes</span></div>
+    <div class="info-card"><span class="val">/20</span><span class="lbl">Score</span></div>
+  </div>
+  <button class="btn-start" onclick="startQuiz()">Démarrer le quiz →</button>
+</div>
+
+<!-- ===== QUIZ ===== -->
+<header id="quiz-header" style="display:none;">
+  <div class="logo">// SQL Transactions Quiz</div>
+  <div class="hud">
+    <div class="progress-info">Question <span id="q-counter">1</span> / 20</div>
+    <div class="timer-wrap">
+      <span class="timer-icon">⏱</span>
+      <div id="timer">20:00</div>
+    </div>
+  </div>
+</header>
+
+<div id="quiz-screen" class="screen">
+  <div class="progress-bar-wrap">
+    <div class="progress-bar-fill" id="progress-bar" style="width:0%"></div>
+  </div>
+  <div class="q-meta" id="q-meta">QUESTION 1 SUR 20</div>
+  <div class="question-text" id="question-text"></div>
+  <div class="code-block" id="code-block" style="display:none;"></div>
+  <div class="options" id="options"></div>
+  <div class="feedback-box" id="feedback-box"></div>
+  <button class="btn-next" id="btn-next" onclick="nextQuestion()">Question suivante →</button>
+</div>
+
+<!-- ===== RESULT ===== -->
+<div id="result-screen" class="screen">
+  <span class="badge">Résultats finaux</span>
+  <div class="score-circle" id="score-circle">
+    <span class="score-num" id="score-num">0</span>
+    <span class="score-denom">/ 20</span>
+  </div>
+  <div class="result-title" id="result-title">Bravo !</div>
+  <div class="result-subtitle" id="result-subtitle"></div>
+  <div class="stats-row">
+    <div class="stat-box good"><span class="sv" id="correct-count">0</span><span class="sl">✓ Correctes</span></div>
+    <div class="stat-box bad"><span class="sv" id="wrong-count">0</span><span class="sl">✗ Incorrectes</span></div>
+    <div class="stat-box"><span class="sv" id="time-used">—</span><span class="sl">Temps utilisé</span></div>
+  </div>
+
+</div>
+
+<script>
+const QUESTIONS = [
+  {
+    q: "Quelle instruction démarre une transaction en SQL Server ?",
+    options: ["START TRANSACTION", "BEGIN TRANSACTION", "OPEN TRANSACTION", "INIT TRANSACTION"],
+    correct: 1,
+    explanation: "En SQL Server, une transaction commence avec BEGIN TRANSACTION (ou BEGIN TRAN en abrégé)."
+  },
+  {
+    q: "Quelle instruction valide définitivement une transaction en SQL Server ?",
+    options: ["SAVE", "ROLLBACK", "COMMIT", "END TRANSACTION"],
+    correct: 2,
+    explanation: "COMMIT (ou COMMIT TRANSACTION) valide toutes les modifications de la transaction et les rend permanentes."
+  },
+  {
+    q: "Quelle instruction annule toutes les modifications d'une transaction ?",
+    options: ["UNDO", "CANCEL", "DELETE TRANSACTION", "ROLLBACK"],
+    correct: 3,
+    explanation: "ROLLBACK annule toutes les opérations effectuées depuis le BEGIN TRANSACTION et restaure l'état précédent."
+  },
+  {
+    q: "Dans le code suivant, que se passe-t-il si @Solde1 = 150 et @Montant1 = 200 ?",
+    code: `IF @Solde1 >= @Montant1\nBEGIN\n    UPDATE Comptes SET Solde = Solde - @Montant1 WHERE Id = 1;\n    COMMIT;\nEND\nELSE\nBEGIN\n    ROLLBACK;\n    PRINT 'Fonds insuffisants';\nEND`,
+    options: [
+      "Le transfert est effectué normalement",
+      "La transaction est annulée et 'Fonds insuffisants' est affiché",
+      "Une erreur SQL est levée automatiquement",
+      "La transaction reste ouverte indéfiniment"
+    ],
+    correct: 1,
+    explanation: "150 < 200 donc la condition IF est fausse → on entre dans le ELSE → ROLLBACK + message 'Fonds insuffisants'."
+  },
+  {
+    q: "À quoi sert BEGIN TRY … END TRY / BEGIN CATCH … END CATCH ?",
+    options: [
+      "Créer une boucle d'itération sur les tables",
+      "Gérer les erreurs SQL : le code de CATCH s'exécute en cas d'exception",
+      "Ouvrir et fermer une connexion à la base de données",
+      "Déclarer des variables locales de manière sécurisée"
+    ],
+    correct: 1,
+    explanation: "TRY/CATCH est le mécanisme de gestion d'exceptions de SQL Server. Si une erreur survient dans le bloc TRY, l'exécution saute au bloc CATCH."
+  },
+  {
+    q: "Quel est le résultat du transfert de 200 depuis le compte d'Ami (solde 500) vers Sitan (solde 300) ?",
+    options: [
+      "Ami = 500, Sitan = 300 (aucun changement)",
+      "Ami = 300, Sitan = 500",
+      "Ami = 700, Sitan = 100",
+      "Erreur : transaction impossible"
+    ],
+    correct: 1,
+    explanation: "500 ≥ 200, donc le transfert réussit. Ami : 500 - 200 = 300. Sitan : 300 + 200 = 500."
+  },
+  {
+    q: "Pourquoi le transfert de 500 unités depuis Moussa (Id=4, solde 100) vers Bourama (Id=3) échoue-t-il ?",
+    options: [
+      "Bourama n'existe pas dans la table",
+      "Le solde de Moussa (100) est inférieur au montant (500)",
+      "La transaction n'a pas été ouverte avec BEGIN TRANSACTION",
+      "La table Comptes est verrouillée par une autre transaction"
+    ],
+    correct: 1,
+    explanation: "La vérification IF @Solde2 >= @Montant2 compare 100 >= 500, ce qui est FAUX → ROLLBACK est exécuté."
+  },
+  {
+    q: "Quel événement SQL Server peut être réservé avec 3 places si PlacesDisponibles = 5 ?",
+    options: [
+      "Conférence A (Id=3, 1 place)",
+      "Conférence C (Id=4, 0 places)",
+      "Concert A (Id=1, 5 places)",
+      "Aucun des événements"
+    ],
+    correct: 2,
+    explanation: "Concert A (Id=1) a 5 places disponibles. 5 ≥ 3 → la réservation est validée avec COMMIT."
+  },
+  {
+    q: "La réservation de 5 places pour Conférence A (Id=3, PlacesDisponibles=1) aboutit-elle ?",
+    options: [
+      "Oui, la table est mise à jour : PlacesDisponibles = -4",
+      "Non, ROLLBACK est exécuté car 1 < 5",
+      "Oui, mais une alerte est envoyée à l'administrateur",
+      "Oui, si NOCOUNT est activé"
+    ],
+    correct: 1,
+    explanation: "La condition IF @Dispo2 >= @Places2 compare 1 >= 5 → FAUX → ROLLBACK. Aucune modification n'est faite."
+  },
+  {
+    q: "Quelle est la fonction de ERROR_MESSAGE() dans un bloc CATCH ?",
+    options: [
+      "Retourner l'identifiant numérique de l'erreur",
+      "Retourner le texte descriptif de l'erreur survenue",
+      "Réinitialiser le compteur d'erreurs du serveur",
+      "Journaliser automatiquement l'erreur dans une table système"
+    ],
+    correct: 1,
+    explanation: "ERROR_MESSAGE() est une fonction de SQL Server disponible dans un bloc CATCH. Elle retourne le message texte de l'erreur qui a déclenché le CATCH."
+  },
+  {
+    q: "Que signifie l'instruction GO en SQL Server ?",
+    options: [
+      "Démarre une nouvelle transaction imbriquée",
+      "Exécute immédiatement les requêtes précédentes et démarre un nouveau lot (batch)",
+      "Indique la fin d'un bloc BEGIN/END",
+      "Connecte à une base de données distante"
+    ],
+    correct: 1,
+    explanation: "GO est un séparateur de lots (batch separator) reconnu par SQL Server Management Studio. Il signale la fin d'un lot d'instructions Transact-SQL."
+  },
+  {
+    q: "Quelle clause SQL est utilisée pour sélectionner la base de données active ?",
+    options: ["CONNECT TO", "SELECT DATABASE", "USE", "SET DATABASE"],
+    correct: 2,
+    explanation: "USE [NomBaseDeDonnées] change le contexte de la connexion vers la base spécifiée. Exemple : USE TP_Transactions;"
+  },
+  {
+    q: "Que retourne SELECT @@TRANCOUNT dans SQL Server après BEGIN TRANSACTION ?",
+    options: ["0", "1", "NULL", "TRUE"],
+    correct: 1,
+    explanation: "@@TRANCOUNT est une variable système qui indique le nombre de transactions actives. Après BEGIN TRANSACTION, elle vaut 1."
+  },
+  {
+    q: "Dans ce code, quel est le rôle du ROLLBACK dans le CATCH ?",
+    code: `BEGIN TRY\n    BEGIN TRANSACTION;\n    UPDATE Comptes SET Solde = Solde - 200 WHERE Id = 1;\n    -- Erreur simulée\n    UPDATE Comptes SET Solde = Solde + 200 WHERE Id = 99;\n    COMMIT;\nEND TRY\nBEGIN CATCH\n    ROLLBACK;\n    PRINT 'Erreur : ' + ERROR_MESSAGE();\nEND CATCH`,
+    options: [
+      "Valider le premier UPDATE même si le second échoue",
+      "Annuler les deux UPDATE pour garantir la cohérence des données",
+      "Recommencer automatiquement la transaction depuis le début",
+      "Supprimer la ligne erronée de la table Comptes"
+    ],
+    correct: 1,
+    explanation: "Le ROLLBACK dans le CATCH annule TOUS les changements de la transaction (y compris le premier UPDATE réussi), garantissant l'atomicité."
+  },
+  {
+    q: "Quelle propriété ACID garantit que les modifications d'une transaction sont soit toutes appliquées, soit aucune ?",
+    options: ["Cohérence (Consistency)", "Isolation", "Durabilité (Durability)", "Atomicité (Atomicity)"],
+    correct: 3,
+    explanation: "L'Atomicité est la propriété ACID qui garantit le principe du 'tout ou rien' : une transaction est une unité indivisible d'exécution."
+  },
+  {
+    q: "Après un COMMIT réussi, que se passe-t-il si le serveur SQL Server tombe en panne ?",
+    options: [
+      "Les données sont perdues car elles n'étaient qu'en mémoire",
+      "Les données sont définitivement sauvegardées grâce à la Durabilité",
+      "La transaction est automatiquement annulée au redémarrage",
+      "SQL Server demande une confirmation manuelle"
+    ],
+    correct: 1,
+    explanation: "La Durabilité (propriété D d'ACID) garantit que les transactions validées (COMMIT) survivent aux pannes grâce au journal des transactions (transaction log)."
+  },
+  {
+    q: "Quelle syntaxe est correcte pour créer la table Comptes ?",
+    options: [
+      "MAKE TABLE Comptes (Id INT, Nom NVARCHAR(100), Solde DECIMAL(10,2));",
+      "CREATE TABLE Comptes (Id INT PRIMARY KEY, Nom NVARCHAR(100), Solde DECIMAL(10,2));",
+      "INSERT TABLE Comptes (Id INT KEY, Nom TEXT, Solde FLOAT);",
+      "NEW TABLE Comptes WITH (Id INT, Nom NVARCHAR, Solde DECIMAL);"
+    ],
+    correct: 1,
+    explanation: "La syntaxe correcte utilise CREATE TABLE avec les types de données et contraintes appropriés (PRIMARY KEY, NVARCHAR, DECIMAL)."
+  },
+  {
+    q: "Combien de places reste-t-il pour Concert A (Id=1) après une réservation réussie de 3 places (initialement 5) ?",
+    options: ["5", "3", "2", "0"],
+    correct: 2,
+    explanation: "UPDATE Evenements SET PlacesDisponibles = PlacesDisponibles - 3 WHERE Id = 1. Résultat : 5 - 3 = 2 places restantes."
+  },
+  {
+    q: "Pourquoi utilise-t-on NVARCHAR plutôt que VARCHAR pour stocker des noms en SQL Server ?",
+    options: [
+      "NVARCHAR est plus rapide que VARCHAR pour les recherches",
+      "NVARCHAR supporte les caractères Unicode (accents, caractères spéciaux)",
+      "VARCHAR est obsolète dans les versions récentes de SQL Server",
+      "NVARCHAR utilise moins d'espace disque que VARCHAR"
+    ],
+    correct: 1,
+    explanation: "NVARCHAR stocke les données en Unicode (UTF-16), ce qui permet de gérer les accents (é, è, ç) et les alphabets non-latins. VARCHAR est limité aux caractères ASCII étendus."
+  },
+  {
+    q: "Dans une transaction de réservation, à quel moment les places sont-elles définitivement déduites dans la base de données ?",
+    options: [
+      "Dès l'exécution du SELECT qui lit les places disponibles",
+      "Après l'exécution du UPDATE sur PlacesDisponibles",
+      "Uniquement après l'exécution du COMMIT",
+      "Après la fermeture de la connexion SQL"
+    ],
+    correct: 2,
+    explanation: "Dans une transaction, les modifications ne deviennent permanentes qu'après le COMMIT. Avant cela, elles sont temporaires et peuvent être annulées par un ROLLBACK."
+  }
+];
+
+let currentQ = 0, score = 0, timerInterval = null, secondsLeft = 1200;
+let userAnswers = [];
+let startTime = null;
+
+function startQuiz() {
+  document.getElementById('start-screen').classList.remove('active');
+  document.getElementById('quiz-header').style.display = 'flex';
+  document.getElementById('quiz-screen').classList.add('active');
+  startTime = Date.now();
+  startTimer();
+  renderQuestion();
+}
+
+function startTimer() {
+  timerInterval = setInterval(() => {
+    secondsLeft--;
+    updateTimerDisplay();
+    if (secondsLeft <= 0) {
+      clearInterval(timerInterval);
+      showResults();
+    }
+  }, 1000);
+}
+
+function updateTimerDisplay() {
+  const m = Math.floor(secondsLeft / 60);
+  const s = secondsLeft % 60;
+  const el = document.getElementById('timer');
+  el.textContent = `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+  el.className = '';
+  if (secondsLeft <= 120) el.classList.add('danger');
+  else if (secondsLeft <= 300) el.classList.add('warning');
+}
+
+function renderQuestion() {
+  const q = QUESTIONS[currentQ];
+  document.getElementById('q-counter').textContent = currentQ + 1;
+  document.getElementById('q-meta').textContent = `QUESTION ${currentQ+1} SUR 20`;
+  document.getElementById('question-text').textContent = q.q;
+
+  const cb = document.getElementById('code-block');
+  if (q.code) { cb.style.display = 'block'; cb.textContent = q.code; }
+  else { cb.style.display = 'none'; }
+
+  const progress = ((currentQ) / 20) * 100;
+  document.getElementById('progress-bar').style.width = progress + '%';
+
+  const letters = ['A', 'B', 'C', 'D'];
+  const optContainer = document.getElementById('options');
+  optContainer.innerHTML = '';
+  q.options.forEach((opt, i) => {
+    const btn = document.createElement('button');
+    btn.className = 'option-btn';
+    btn.innerHTML = `<span class="letter">${letters[i]}</span><span>${opt}</span>`;
+    btn.onclick = () => selectAnswer(i, btn);
+    optContainer.appendChild(btn);
+  });
+
+  const fb = document.getElementById('feedback-box');
+  fb.className = 'feedback-box';
+  fb.textContent = '';
+  document.getElementById('btn-next').className = 'btn-next';
+}
+
+function selectAnswer(idx, clickedBtn) {
+  const q = QUESTIONS[currentQ];
+  const allBtns = document.querySelectorAll('.option-btn');
+  allBtns.forEach(b => b.disabled = true);
+
+  const isCorrect = idx === q.correct;
+  if (isCorrect) score++;
+
+  userAnswers.push({ qIndex: currentQ, chosen: idx, correct: isCorrect });
+
+  clickedBtn.classList.add(isCorrect ? 'correct' : 'wrong');
+  if (!isCorrect) allBtns[q.correct].classList.add('correct');
+
+  const fb = document.getElementById('feedback-box');
+  fb.className = 'feedback-box show ' + (isCorrect ? 'correct-fb' : 'wrong-fb');
+  fb.innerHTML = (isCorrect ? '✓ Correct ! ' : '✗ Incorrect. ') + q.explanation;
+
+  const nextBtn = document.getElementById('btn-next');
+  nextBtn.className = 'btn-next show';
+  nextBtn.textContent = currentQ < 19 ? 'Question suivante →' : 'Voir mes résultats →';
+}
+
+function nextQuestion() {
+  currentQ++;
+  if (currentQ >= 20) { showResults(); return; }
+  renderQuestion();
+}
+
+function showResults() {
+  clearInterval(timerInterval);
+  const elapsed = Math.round((Date.now() - startTime) / 1000);
+  const em = Math.floor(elapsed / 60), es = elapsed % 60;
+
+  document.getElementById('quiz-header').style.display = 'none';
+  document.getElementById('quiz-screen').classList.remove('active');
+  document.getElementById('result-screen').classList.add('active');
+
+  const pct = (score / 20) * 360;
+  document.getElementById('score-circle').style.setProperty('--score-pct', pct + 'deg');
+  document.getElementById('score-num').textContent = score;
+  document.getElementById('correct-count').textContent = score;
+  document.getElementById('wrong-count').textContent = 20 - score;
+  document.getElementById('time-used').textContent = `${String(em).padStart(2,'0')}:${String(es).padStart(2,'0')}`;
+
+  const titles = [
+    [0, 7, "À revoir…", "Revoyez les concepts fondamentaux des transactions SQL Server."],
+    [8, 12, "Pas mal !", "Vous avez les bases, continuez à pratiquer !"],
+    [13, 16, "Bien joué !", "Bonne maîtrise des transactions SQL Server."],
+    [17, 19, "Excellent !", "Très belle performance sur ce quiz !"],
+    [20, 20, "Parfait ! 🏆", "Score parfait ! Vous maîtrisez les transactions SQL Server."]
+  ];
+  for (const [min, max, t, s] of titles) {
+    if (score >= min && score <= max) {
+      document.getElementById('result-title').textContent = t;
+      document.getElementById('result-subtitle').textContent = s;
+      break;
+    }
+  }
+
+  const reviewList = document.getElementById('review-list');
+  reviewList.innerHTML = '';
+  userAnswers.forEach(({ qIndex, chosen, correct }) => {
+    const q = QUESTIONS[qIndex];
+    const div = document.createElement('div');
+    div.className = 'review-item ' + (correct ? 'ok' : 'ko');
+    div.innerHTML = `
+      <div class="ri-dot">${correct ? '✓' : '✗'}</div>
+      <div>
+        <div class="ri-q">${q.q}</div>
+        <div class="ri-a">Votre réponse : ${q.options[chosen]} ${!correct ? '→ Correct : ' + q.options[q.correct] : ''}</div>
+      </div>
+    `;
+    reviewList.appendChild(div);
+  });
+
+  // Questions non répondues (temps écoulé)
+  for (let i = userAnswers.length; i < 20; i++) {
+    const q = QUESTIONS[i];
+    const div = document.createElement('div');
+    div.className = 'review-item ko';
+    div.innerHTML = `
+      <div class="ri-dot">—</div>
+      <div>
+        <div class="ri-q">${q.q}</div>
+        <div class="ri-a">Non répondue → Correct : ${q.options[q.correct]}</div>
+      </div>
+    `;
+    reviewList.appendChild(div);
+  }
+}
+
+</script>
+</body>
+</html>
